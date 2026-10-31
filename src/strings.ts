@@ -98,6 +98,9 @@ export const STRINGS = {
   stormSummoned: 'Storm summoned! The rain cloud is after your opponent!',
   stormChasing: 'A rain cloud is chasing you!',
   stormRain: 'Rain!',
+  crowdPenalty: (s: number) => `🪑 Penalty! You crashed into the crowd — back in ${s}`,
+  crowdPenaltyOther: (name: string) => `${name} crashed into the crowd!`,
+  crowdPenaltyOver: 'Back on your broom!',
   boundary: 'Turn back — edge of the grounds',
 
   playerName: (i: number) => `Player ${i + 1}`,

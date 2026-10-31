@@ -83,6 +83,35 @@ const tmp2 = new Vector3();
 export interface CollisionResult {
   hit: boolean;
   normal: Vector3;
+  /** True when the hit was the seating area of the stands (where the crowd sits). */
+  stands?: boolean;
+}
+
+/** True where spectators sit (stands, excluding the booth gap). */
+export function inCrowdArea(x: number, z: number): boolean {
+  const s = ellipseRadius(x, z);
+  if (s < 1 || s > AR.standsOuter) return false;
+  if (z > AR.fieldB * 0.7 && Math.abs(x) < 9) return false;
+  return true;
+}
+
+/** A seat on the stands near (x, z), facing the pitch. */
+export function crowdSeat(x: number, z: number, out: Vector3): { yaw: number } {
+  const s = ellipseRadius(x, z) || 1;
+  const target = Math.min(AR.standsOuter - 0.04, Math.max(1.05, s));
+  out.set((x / s) * target, 0, (z / s) * target);
+  out.y = groundHeight(out.x, out.z) + 0.9;
+  const dx = -out.x / (AR.fieldA * AR.fieldA);
+  const dz = -out.z / (AR.fieldB * AR.fieldB);
+  return { yaw: Math.atan2(-dx, -dz) };
+}
+
+/** Point just in front of the stands (over the pitch edge) to take off again. */
+export function standsExit(x: number, z: number, out: Vector3): Vector3 {
+  const s = ellipseRadius(x, z) || 1;
+  out.set((x / s) * 0.93, 0, (z / s) * 0.93);
+  out.y = Math.max(groundHeight(x, z) + 3, 8);
+  return out;
 }
 
 /**
@@ -91,6 +120,7 @@ export interface CollisionResult {
  */
 export function resolveCollisions(p: Vector3, vel: Vector3, r: number, out: CollisionResult): CollisionResult {
   out.hit = false;
+  out.stands = false;
   out.normal.set(0, 0, 0);
 
   // Ground / stands heightfield.
@@ -98,6 +128,7 @@ export function resolveCollisions(p: Vector3, vel: Vector3, r: number, out: Coll
   const pen = g + r - p.y;
   if (pen > 0) {
     out.hit = true;
+    if (inCrowdArea(p.x, p.z)) out.stands = true;
     if (pen > 1.4) {
       // A tall step (stand front / rim wall): push sideways toward the lower side.
       const len = Math.hypot(p.x, p.z) || 1;

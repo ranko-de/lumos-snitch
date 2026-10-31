@@ -19,7 +19,7 @@ import {
   type DumbledoreEvent,
   type GhostEvent,
 } from './eggs';
-import { createPlayer, resetPlayer, stepFlight, tryBoost, type PlayerState } from './player';
+import { createPlayer, resetPlayer, seatInCrowd, stepFlight, stepSeated, tryBoost, type PlayerState } from './player';
 import {
   chooseRespawn,
   createSnitch,
@@ -40,6 +40,8 @@ export type SimEvent =
   | { type: 'tie'; at: Vector3 }
   | { type: 'respawn'; at: Vector3 }
   | { type: 'bump'; player: 0 | 1 }
+  | { type: 'seated'; player: 0 | 1; at: Vector3 }
+  | { type: 'unseated'; player: 0 | 1 }
   | { type: 'hint'; at: Vector3 }
   | { type: 'countdownTick'; value: number }
   | { type: 'go' }
@@ -202,7 +204,7 @@ export class Simulation {
 
     if (this.phase === 'ended') {
       for (let i = 0; i < 2; i++) {
-        if (!this.active[i]) continue;
+        if (!this.active[i] || this.players[i].seatedTime > 0) continue;
         stepFlight(this.players[i], cmds[i], dt);
         this.players[i].lastBoostPresses = cmds[i].boostPresses;
       }
@@ -213,8 +215,20 @@ export class Simulation {
     this.handleBoosts(cmds);
     for (let i = 0 as 0 | 1; i < 2; i = (i + 1) as 0 | 1) {
       if (!this.active[i]) continue;
-      this.prevPos[i].copy(this.players[i].pos);
-      const r = stepFlight(this.players[i], cmds[i], dt);
+      const pl = this.players[i];
+      if (pl.seatedTime > 0) {
+        // Penalty: sitting with the spectators.
+        if (stepSeated(pl, dt)) this.events.push({ type: 'unseated', player: i });
+        pl.canCatch = false;
+        continue;
+      }
+      this.prevPos[i].copy(pl.pos);
+      const r = stepFlight(pl, cmds[i], dt);
+      if (r.crowdHit && this.phase === 'playing' && pl.seatImmunity <= 0) {
+        seatInCrowd(pl);
+        this.events.push({ type: 'seated', player: i, at: pl.pos.clone() });
+        continue;
+      }
       if (r.bumped) this.events.push({ type: 'bump', player: i });
       const ring = ringPassed(this.prevPos[i], this.players[i].pos);
       if (ring) {
@@ -283,6 +297,7 @@ export class Simulation {
       p.lastBoostPresses = presses;
       if (!pressed) continue;
       if (this.phase === 'practice') this.practice[p.index].boost = true;
+      if (p.seatedTime > 0) continue;
       if (tryBoost(p)) this.events.push({ type: 'boost', player: p.index });
     }
   }
@@ -292,6 +307,10 @@ export class Simulation {
     this.successes.length = 0;
     for (const p of this.players) {
       if (!this.active[p.index]) continue;
+      if (p.seatedTime > 0) {
+        p.canCatch = false;
+        continue;
+      }
       catchOrigin(p, this.scratch);
       checkCatch(this.scratch, this.snitch.pos, this.snitch.visible, this.check);
       p.canCatch = this.check.ok;

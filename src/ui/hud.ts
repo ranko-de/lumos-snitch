@@ -15,6 +15,7 @@ interface HalfRefs {
   hoopChip: HTMLElement;
   spell: HTMLElement;
   storm: HTMLElement;
+  penalty: HTMLElement;
   lens: LensRain;
   msg: HTMLElement;
   boundary: HTMLElement;
@@ -88,6 +89,7 @@ export class Hud {
     card.append(name, score, row);
     const spell = div('hud-spell');
     const storm = div('hud-storm');
+    const penalty = div('hud-storm penalty');
     const lens = new LensRain();
     const msg = div('hud-msg');
     const boundary = div('hud-boundary');
@@ -108,7 +110,7 @@ export class Hud {
     const keys = div('hud-keys');
     keys.dataset.role = 'keys';
     practice.append(title, ul, keys);
-    root.append(lens.root, card, spell, storm, msg, boundary, reticle, reticleLabel, practice);
+    root.append(lens.root, card, spell, storm, penalty, msg, boundary, reticle, reticleLabel, practice);
     this.root.appendChild(root);
     return {
       root,
@@ -120,6 +122,7 @@ export class Hud {
       hoopChip,
       spell,
       storm,
+      penalty,
       lens,
       msg,
       boundary,
@@ -237,6 +240,9 @@ export class Hud {
       const hunted = playing2 && storm.victim === i && (storm.phase === 'chase' || storm.phase === 'rain');
       setClass(h.storm, 'on', hunted);
       if (hunted) setText(h.storm, storm.phase === 'chase' ? `☁ ${STRINGS.stormChasing}` : `☔ ${STRINGS.stormRain} ${Math.ceil(storm.rainLeft)}`);
+      const seated = p.seatedTime > 0 && sim.phase === 'playing';
+      setClass(h.penalty, 'on', seated);
+      if (seated) setText(h.penalty, STRINGS.crowdPenalty(Math.ceil(p.seatedTime)));
       h.lens.update(dt, playing2 ? rainOn(storm, i) : 0);
 
       if (h.msgTimer > 0) h.msgTimer -= dt;

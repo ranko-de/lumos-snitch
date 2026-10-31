@@ -758,3 +758,8 @@ kbd {
   background: rgba(60, 90, 150, 0.55);
   border-color: rgba(188, 212, 255, 0.7);
 }
+.hud-storm.penalty {
+  top: 216px;
+  background: rgba(150, 70, 20, 0.9);
+  border-color: #ffd9a0;
+}

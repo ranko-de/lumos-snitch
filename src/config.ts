@@ -121,13 +121,13 @@ export const CONFIG = {
     /**
      * Night needs the sensor covered, not just a passing shade.
      * micro:bit light level is 0..255. Night when light <= max(nightMaxLevel,
-     * the room's usual level × nightMaxRatio); a hand's shadow (~30-50%) stays day.
+     * the room's usual level × nightMaxRatio).
      */
     nightMaxLevel: 14,
-    nightMaxRatio: 0.18,
+    nightMaxRatio: 0.3,
     /** Back to day when light > max(dayMinLevel, usual level × dayMinRatio). */
     dayMinLevel: 22,
-    dayMinRatio: 0.3,
+    dayMinRatio: 0.42,
     /** Night must be held this long before switching (filters a passing shadow). */
     nightHold: 0.15,
     /** Hysteresis band as fraction of (open - covered). */
@@ -172,6 +172,13 @@ export const CONFIG = {
     radius: 4,
     /** Distances closer than this are treated as an exact tie. */
     tieTolerance: 0.05,
+  },
+
+  /** Flying into the crowd: you sit down among the spectators for a while. */
+  crowdPenalty: {
+    seatTime: 5,
+    /** After standing up you cannot be seated again for this long. */
+    immunity: 2.5,
   },
 
   /** Easter egg 3: fly through three different hoops → a rain cloud chases the opponent. */

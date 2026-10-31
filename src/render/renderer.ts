@@ -323,6 +323,15 @@ export class GameRenderer {
           this.particles.emit(p.pos, 12, 0xd8e6c8, 3, { life: 0.5, size: 0.4 });
           break;
         }
+        case 'seated':
+          this.cheer = 1;
+          this.particles.emit(e.at, 40, 0xfff2c0, 5, { life: 0.9, size: 0.45, spread: new Vector3(1.5, 1, 1.5) });
+          break;
+        case 'unseated': {
+          const p = sim.players[e.player];
+          this.particles.emit(p.pos, 30, 0xbfe3ff, 4, { life: 0.7, size: 0.4 });
+          break;
+        }
         case 'stormSummon':
           this.particles.emit(sim.storm.pos, 50, 0x9fb3d9, 5, { life: 1.2, size: 0.6, spread: new Vector3(3, 1, 3) });
           break;
@@ -374,6 +383,16 @@ export class GameRenderer {
       sh.scale.setScalar(1 + hgt * 0.02);
       (sh.material as MeshBasicMaterial).opacity = Math.max(0.05, 0.3 - hgt * 0.006);
       r.root.visible = sim.phase !== 'attract' && sim.active[i];
+      // Crowd penalty: off the broom, sitting among the spectators and waving.
+      const seated = p.seatedTime > 0;
+      r.wobble.children[0].visible = !seated;
+      if (seated) {
+        r.bank.rotation.z = 0;
+        r.body.rotation.set(0.15, 0, 0);
+        r.root.position.y -= 0.35;
+        r.rightArm.rotation.x = -2.6 + Math.sin(time * 6 + i) * 0.35;
+        sh.visible = false;
+      }
       this.boothProximity[i] = Math.max(0, 1 - p.pos.distanceTo(BOOTH.zoneCenter) / CONFIG.dumbledore.hintRadius);
     }
 
@@ -458,6 +477,11 @@ export class GameRenderer {
       const gMin = groundHeight(this.tmp.x, this.tmp.z) + 0.6;
       if (this.tmp.y < gMin) this.tmp.y = gMin;
       this.tmp2.set(r.x + fx * CAM.lookAhead, r.y + fy * CAM.lookAhead + CAM.lookUp, r.z + fz * CAM.lookAhead);
+      if (p.seatedTime > 0) {
+        // Seated in the crowd: look back at yourself from just over the pitch.
+        this.tmp.set(r.x + fx * 7, r.y + 3.2, r.z + fz * 7);
+        this.tmp2.set(r.x, r.y + 0.6, r.z);
+      }
       if (!this.camInit[i]) {
         this.camPos[i].copy(this.tmp);
         this.camLook[i].copy(this.tmp2);

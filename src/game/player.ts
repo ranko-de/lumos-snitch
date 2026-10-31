@@ -1,7 +1,7 @@
 import { Vector3 } from 'three';
 import { CONFIG } from '../config';
 import type { PlayerCommand } from '../input/types';
-import { clampToBounds, resolveCollisions, type CollisionResult } from './arena';
+import { clampToBounds, crowdSeat, resolveCollisions, standsExit, type CollisionResult } from './arena';
 
 const F = CONFIG.flight;
 
@@ -39,6 +39,10 @@ export interface PlayerState {
   nearBoundary: boolean;
   /** Last input turn value, for rider animation. */
   turnInput: number;
+  /** Seconds left sitting in the crowd (penalty for flying into the stands). */
+  seatedTime: number;
+  /** Seconds during which a new crowd penalty cannot happen. */
+  seatImmunity: number;
 }
 
 export function createPlayer(index: 0 | 1): PlayerState {
@@ -66,6 +70,8 @@ export function createPlayer(index: 0 | 1): PlayerState {
     bumpCooldown: 0,
     nearBoundary: false,
     turnInput: 0,
+    seatedTime: 0,
+    seatImmunity: 0,
   };
   resetPlayer(p);
   return p;
@@ -94,6 +100,8 @@ export function resetPlayer(p: PlayerState): void {
   p.bumpCooldown = 0;
   p.nearBoundary = false;
   p.turnInput = 0;
+  p.seatedTime = 0;
+  p.seatImmunity = 0;
 }
 
 export function updateBasis(p: PlayerState): void {
@@ -112,14 +120,18 @@ function approach(current: number, target: number, rate: number, dt: number): nu
 
 export interface FlightResult {
   bumped: boolean;
+  /** Flew into the spectators this step. */
+  crowdHit: boolean;
 }
 
-const result: FlightResult = { bumped: false };
+const result: FlightResult = { bumped: false, crowdHit: false };
 
 /** Arcade flight step. Frame-rate independent (called with the fixed sim step). */
 export function stepFlight(p: PlayerState, cmd: PlayerCommand, dt: number): FlightResult {
   result.bumped = false;
+  result.crowdHit = false;
   p.turnInput = cmd.turn;
+  if (p.seatImmunity > 0) p.seatImmunity = Math.max(0, p.seatImmunity - dt);
 
   const speedNorm = Math.min(1, Math.max(0, (p.speed - F.hoverSpeed) / (F.cruiseSpeed - F.hoverSpeed)));
   // Holding brake trades speed for a much tighter, snappier turn.
@@ -173,6 +185,7 @@ export function stepFlight(p: PlayerState, cmd: PlayerCommand, dt: number): Flig
   if (p.bumpCooldown > 0) p.bumpCooldown -= dt;
   resolveCollisions(p.pos, p.vel, F.riderRadius, col);
   if (col.hit) {
+    if (col.stands) result.crowdHit = true;
     if (p.bumpCooldown <= 0) {
       p.speed *= F.collisionSlowdown;
       p.vel.multiplyScalar(F.collisionSlowdown);
@@ -187,12 +200,49 @@ export function stepFlight(p: PlayerState, cmd: PlayerCommand, dt: number): Flig
   if (p.boostTime > 0) p.boostTime = Math.max(0, p.boostTime - dt);
   if (p.grabAnim > 0) p.grabAnim = Math.max(0, p.grabAnim - dt);
 
-  // Visual night blend (0.5 s ease) is part of the shared state so both views agree.
+  stepDarkBlend(p, dt);
+  return result;
+}
+
+/** Visual night blend (0.5 s ease) is part of the shared state so both views agree. */
+export function stepDarkBlend(p: PlayerState, dt: number): void {
   const target = p.dark ? 1 : 0;
   const rate = dt / CONFIG.lighting.transition;
   p.darkBlend = target > p.darkBlend ? Math.min(target, p.darkBlend + rate) : Math.max(target, p.darkBlend - rate);
+}
 
-  return result;
+const exitPos = new Vector3();
+
+/** Penalty: sit down in the crowd at the spot that was hit. */
+export function seatInCrowd(p: PlayerState): void {
+  const { yaw } = crowdSeat(p.pos.x, p.pos.z, p.pos);
+  p.yaw = yaw;
+  p.yawRate = 0;
+  p.pitch = 0;
+  p.bank = 0;
+  p.speed = 0;
+  p.vel.set(0, 0, 0);
+  p.boostTime = 0;
+  p.crazyTime = 0;
+  p.turnInput = 0;
+  p.seatedTime = CONFIG.crowdPenalty.seatTime;
+  updateBasis(p);
+}
+
+/** One step while seated. Returns true on the step the player takes off again. */
+export function stepSeated(p: PlayerState, dt: number): boolean {
+  stepDarkBlend(p, dt);
+  if (p.boostCooldown > 0) p.boostCooldown = Math.max(0, p.boostCooldown - dt);
+  p.seatedTime = Math.max(0, p.seatedTime - dt);
+  if (p.seatedTime > 0) return false;
+  // Back on the broom, just in front of the stands, facing the pitch.
+  standsExit(p.pos.x, p.pos.z, exitPos);
+  p.pos.copy(exitPos);
+  p.speed = F.cruiseSpeed * 0.5;
+  updateBasis(p);
+  p.vel.copy(p.forward).multiplyScalar(p.speed);
+  p.seatImmunity = CONFIG.crowdPenalty.immunity;
+  return true;
 }
 
 /** Starts a speed boost if it is off cooldown. Returns true when it fired. */

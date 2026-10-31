@@ -163,8 +163,8 @@ describe('no-calibration defaults', () => {
     for (const open of [200, 120, 40]) {
       const det = new AdaptiveLight();
       for (let k = 0; k < 60; k++) det.update(open, 1 / 20);
-      // Shade from a hand or body (about a third of the room light) stays day.
-      for (const shade of [open * 0.5, Math.max(24, open * 0.3)]) {
+      // Light shade (about half of the room light) stays day.
+      for (const shade of [open * 0.6, Math.max(18, open * 0.4)]) {
         for (let k = 0; k < 100; k++) det.update(Math.round(shade), 1 / 20);
         expect(det.dark).toBe(false);
       }

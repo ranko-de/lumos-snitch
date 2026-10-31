@@ -352,5 +352,51 @@ describe('single player', () => {
     for (let t = 0; t < 0.5; t += STEP) sim.step(STEP, [cmd(), cmd()]);
     expect(sim.storm.hoops[0].length).toBe(1);
   });
+
+  it('flying into the crowd seats you in the stands for 5 s, then you fly on', () => {
+    const sim = playing();
+    const p = sim.players[0];
+    // Head straight into the long stand on the -Z side.
+    p.pos.set(0, 6, -(CONFIG.arena.fieldB - 2));
+    p.yaw = 0;
+    p.pitch = 0;
+    p.speed = CONFIG.flight.cruiseSpeed;
+    p.forward.set(0, 0, -1);
+    p.vel.set(0, 0, -CONFIG.flight.cruiseSpeed);
+    const evs: SimEvent[] = [];
+    for (let t = 0; t < 1 && p.seatedTime <= 0; t += STEP) {
+      sim.step(STEP, [cmd(), cmd()]);
+      evs.push(...sim.events.splice(0));
+    }
+    expect(p.seatedTime).toBeGreaterThan(4.5);
+    expect(evs.some((e) => e.type === 'seated' && e.player === 0)).toBe(true);
+    const seat = p.pos.clone();
+    // Seated: no flying, no catching, even with the snitch right there.
+    sim.snitch.pos.copy(seat).y += CONFIG.catch.originHeight;
+    sim.snitch.visible = true;
+    for (let t = 0; t < 2; t += STEP) sim.step(STEP, [cmd({ turn: 1, climb: 1 }), cmd()]);
+    expect(p.pos.distanceTo(seat)).toBeLessThan(1e-6);
+    expect(p.score).toBe(0);
+    sim.events.length = 0;
+    for (let t = 0; t < CONFIG.crowdPenalty.seatTime - 2 + 0.1; t += STEP) {
+      sim.step(STEP, [cmd(), cmd()]);
+      evs.push(...sim.events.splice(0));
+    }
+    expect(p.seatedTime).toBe(0);
+    expect(evs.some((e) => e.type === 'unseated')).toBe(true);
+    // Back over the pitch edge, flying again.
+    expect(p.speed).toBeGreaterThan(5);
+    sim.step(STEP, [cmd(), cmd()]);
+    expect(p.pos.distanceTo(seat)).toBeGreaterThan(1);
+  });
+
+  it('touching the grass or a hoop post is not a crowd penalty', () => {
+    const sim = playing();
+    const p = sim.players[0];
+    p.pos.set(0, 0.5, 0);
+    p.pitch = -0.6;
+    for (let t = 0; t < 1; t += STEP) sim.step(STEP, [cmd({ climb: -1 }), cmd()]);
+    expect(p.seatedTime).toBe(0);
+  });
 });
 

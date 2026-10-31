@@ -275,6 +275,18 @@ export class App {
           this.audio.playSpellHit(e.victim);
           this.audio.playOoh();
           break;
+        case 'seated': {
+          const other = e.player === 0 ? 1 : 0;
+          if (!this.sim.singlePlayer) this.hud.message(other, STRINGS.crowdPenaltyOther(STRINGS.playerName(e.player)), 2.5);
+          this.audio.playBump(e.player);
+          this.audio.playOoh();
+          this.audio.playCheer(0.6);
+          break;
+        }
+        case 'unseated':
+          this.hud.message(e.player, STRINGS.crowdPenaltyOver, 1.5);
+          this.audio.playBoost(e.player);
+          break;
         case 'hoopProgress':
           this.audio.playHoopProgress(e.count, e.player);
           break;
