@@ -70,6 +70,10 @@ npm test             # בדיקות יחידה (Vitest)
 
 ### צריבת הלוחות (MakeCode)
 
+**הדרך הקלה:** בתיקייה [`firmware/hex/`](firmware/hex) יש קבצים מוכנים — `lumos-controller-p1.hex`, `lumos-controller-p2.hex` ו־`lumos-receiver.hex`. הורידו את הקובץ המתאים וגררו אותו לכונן `MICROBIT` של הלוח (או פתחו אותו ב־MakeCode ← **Import**).
+
+לחלופין, לבנייה מהקוד:
+
 לכל אחת משלוש התיקיות ב־`firmware/` יש `main.ts` ו־`pxt.json`.
 
 1. פתחו את [makecode.microbit.org](https://makecode.microbit.org) ← **New Project**, ותנו שם (למשל `lumos-p1`).
