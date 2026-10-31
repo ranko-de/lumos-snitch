@@ -1,0 +1,16 @@
+{
+    "name": "lumos-snitch-receiver",
+    "version": "1.0.0",
+    "description": "Lumos & Snitch — radio to USB serial bridge (NDJSON, 115200 baud).",
+    "dependencies": {
+        "core": "*",
+        "radio": "*"
+    },
+    "files": [
+        "main.ts"
+    ],
+    "supportedTargets": [
+        "microbit"
+    ],
+    "preferredEditor": "tsprj"
+}

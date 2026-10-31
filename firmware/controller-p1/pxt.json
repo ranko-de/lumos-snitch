@@ -1,0 +1,16 @@
+{
+    "name": "lumos-snitch-controller-p1",
+    "version": "1.0.0",
+    "description": "Lumos & Snitch — Player 1 tilt controller (sends 12-byte radio packets).",
+    "dependencies": {
+        "core": "*",
+        "radio": "*"
+    },
+    "files": [
+        "main.ts"
+    ],
+    "supportedTargets": [
+        "microbit"
+    ],
+    "preferredEditor": "tsprj"
+}
