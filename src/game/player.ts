@@ -122,8 +122,11 @@ export function stepFlight(p: PlayerState, cmd: PlayerCommand, dt: number): Flig
   p.turnInput = cmd.turn;
 
   const speedNorm = Math.min(1, Math.max(0, (p.speed - F.hoverSpeed) / (F.cruiseSpeed - F.hoverSpeed)));
-  const targetYawRate = cmd.turn * F.maxYawRate * (1 + F.slowTurnBoost * (1 - speedNorm));
-  p.yawRate = approach(p.yawRate, targetYawRate, F.yawResponse, dt);
+  // Holding brake trades speed for a much tighter, snappier turn.
+  const carve = cmd.brake ? F.brakeTurnBoost : 1;
+  const grip = cmd.brake ? F.brakeGrip : 1;
+  const targetYawRate = cmd.turn * F.maxYawRate * (1 + F.slowTurnBoost * (1 - speedNorm)) * carve;
+  p.yawRate = approach(p.yawRate, targetYawRate, F.yawResponse * grip, dt);
   p.yaw -= p.yawRate * dt;
   if (p.yaw > Math.PI) p.yaw -= Math.PI * 2;
   else if (p.yaw < -Math.PI) p.yaw += Math.PI * 2;
@@ -134,7 +137,7 @@ export function stepFlight(p: PlayerState, cmd: PlayerCommand, dt: number): Flig
 
   let targetSpeed: number;
   if (cmd.brake) {
-    targetSpeed = F.hoverSpeed;
+    targetSpeed = Math.max(F.hoverSpeed, F.cruiseSpeed * F.brakeSpeedFactor);
   } else {
     const pitchNorm = p.pitch / F.maxPitch;
     targetSpeed = F.cruiseSpeed + (pitchNorm < 0 ? -pitchNorm * F.diveBonus : -pitchNorm * F.climbPenalty);
@@ -147,7 +150,7 @@ export function stepFlight(p: PlayerState, cmd: PlayerCommand, dt: number): Flig
 
   updateBasis(p);
   desired.copy(p.forward).multiplyScalar(p.speed);
-  const k = 1 - Math.exp(-F.velocityResponse * dt);
+  const k = 1 - Math.exp(-F.velocityResponse * grip * dt);
   p.vel.lerp(desired, k);
 
   // Crazy Broom: a gentle side-to-side swerve on top of normal control.
@@ -164,7 +167,7 @@ export function stepFlight(p: PlayerState, cmd: PlayerCommand, dt: number): Flig
 
   p.pos.addScaledVector(p.vel, dt).addScaledVector(crazyOffset, dt);
 
-  const targetBank = cmd.turn * F.maxBank * (0.55 + 0.45 * speedNorm);
+  const targetBank = cmd.turn * F.maxBank * (cmd.brake ? F.brakeBank : 0.55 + 0.45 * speedNorm);
   p.bank = approach(p.bank, targetBank, F.bankResponse, dt);
 
   if (p.bumpCooldown > 0) p.bumpCooldown -= dt;

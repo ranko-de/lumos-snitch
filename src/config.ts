@@ -63,6 +63,14 @@ export const CONFIG = {
     /** How quickly speed approaches its target (1/s). */
     accel: 1.6,
     brakeDecel: 2.4,
+    /** Holding brake (B) slows the broom to this share of cruise speed... */
+    brakeSpeedFactor: 0.55,
+    /** ...and turns harder: yaw rate multiplier while braking. */
+    brakeTurnBoost: 1.6,
+    /** While braking, heading/velocity react this much faster (less drift, sharper carve). */
+    brakeGrip: 2.2,
+    /** Extra lean while carving a braked turn (multiplier on maxBank). */
+    brakeBank: 1.35,
     maxYawRate: 1.55,
     /** Extra yaw rate multiplier at hover speed (tight turns while braking). */
     slowTurnBoost: 0.9,

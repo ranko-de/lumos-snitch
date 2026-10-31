@@ -3,6 +3,7 @@ import { BOOTH } from '../src/game/arena';
 import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../src/config';
 import { checkCatch, resolveCatches } from '../src/game/catch';
+import { createPlayer, stepFlight, updateBasis } from '../src/game/player';
 import { catchOrigin, ringPassed, Simulation, type SimEvent } from '../src/game/simulation';
 import type { PlayerCommand } from '../src/input/types';
 
@@ -213,12 +214,34 @@ describe('flight', () => {
     }
   });
 
-  it('braking slows to a near hover', () => {
+  it('braking (B) slows down only partly', () => {
     const sim = playing();
     const c: [PlayerCommand, PlayerCommand] = [cmd({ brake: true }), cmd()];
     for (let t = 0; t < 3; t += STEP) sim.step(STEP, c);
-    expect(sim.players[0].speed).toBeLessThan(CONFIG.flight.hoverSpeed + 1);
-    expect(sim.players[1].speed).toBeGreaterThan(10);
+    const braked = sim.players[0].speed;
+    expect(braked).toBeLessThan(CONFIG.flight.cruiseSpeed * 0.7);
+    expect(braked).toBeGreaterThan(CONFIG.flight.cruiseSpeed * 0.4);
+    expect(sim.players[1].speed).toBeGreaterThan(18);
+  });
+
+  it('braking while turning gives a much tighter, faster turn', () => {
+    const run = (brake: boolean) => {
+      const p = createPlayer(0);
+      p.pos.set(0, 20, 0);
+      p.speed = CONFIG.flight.cruiseSpeed;
+      updateBasis(p);
+      p.vel.copy(p.forward).multiplyScalar(p.speed);
+      let turned = 0;
+      for (let t = 0; t < 1.5; t += STEP) {
+        stepFlight(p, cmd({ turn: 1, brake }), STEP);
+        turned += p.yawRate * STEP;
+      }
+      return { turned, radius: p.speed / p.yawRate };
+    };
+    const normal = run(false);
+    const carve = run(true);
+    expect(carve.turned).toBeGreaterThan(normal.turned * 1.5);
+    expect(carve.radius).toBeLessThan(normal.radius * 0.5);
   });
 
   it('can fly through the open hoop without being pushed', () => {

@@ -72,7 +72,7 @@ export const STRINGS = {
   tutorialReady: 'Ready!',
   keysP1: 'A/D turn · W dive · S climb · F boost · G brake · R night',
   keysP2: '←/→ turn · ↑ dive · ↓ climb · K boost · L brake · O night',
-  controllerHint: 'Tilt to steer · A boost · hold B brake · cover top LEDs for night',
+  controllerHint: 'Tilt to steer · A boost · hold B + tilt for a sharp turn · cover top LEDs for night',
 
   go: 'GO!',
   overtime: 'OVERTIME — next catch wins!',
