@@ -163,13 +163,13 @@ describe('no-calibration defaults', () => {
     for (const open of [200, 120, 40]) {
       const det = new AdaptiveLight();
       for (let k = 0; k < 60; k++) det.update(open, 1 / 20);
-      // Deep shade: a quarter (and even a sixth) of the room light stays day.
-      for (const shade of [open * 0.25, Math.max(10, open * 0.16), 15]) {
+      // Shade from a hand or body (about a third of the room light) stays day.
+      for (const shade of [open * 0.5, Math.max(24, open * 0.3)]) {
         for (let k = 0; k < 100; k++) det.update(Math.round(shade), 1 / 20);
         expect(det.dark).toBe(false);
       }
-      // A finger right over the LEDs reads almost nothing → night.
-      for (let k = 0; k < 10; k++) det.update(1, 1 / 20);
+      // A finger over the LEDs (some light still leaking in) → night.
+      for (let k = 0; k < 10; k++) det.update(Math.round(Math.max(8, open * 0.12)), 1 / 20);
       expect(det.dark).toBe(true);
     }
   });
@@ -177,14 +177,14 @@ describe('no-calibration defaults', () => {
   it('a quick passing shadow does not flip to night', () => {
     const det = new AdaptiveLight();
     for (let k = 0; k < 60; k++) det.update(150, 1 / 20);
-    for (let k = 0; k < 3; k++) det.update(1, 1 / 20); // 0.15 s
+    for (let k = 0; k < 2; k++) det.update(1, 1 / 20); // 0.1 s
     det.update(150, 1 / 20);
     expect(det.dark).toBe(false);
   });
 
   it('stays in day mode when the room is too dark to tell', () => {
     const det = new AdaptiveLight();
-    for (let k = 0; k < 100; k++) det.update(k % 2 ? 9 : 1, 1 / 20);
+    for (let k = 0; k < 100; k++) det.update(k % 2 ? 10 : 1, 1 / 20);
     expect(det.dark).toBe(false);
   });
 

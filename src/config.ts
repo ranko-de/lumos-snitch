@@ -119,17 +119,17 @@ export const CONFIG = {
     disconnectAfter: 1.5,
     lightDebounce: 0.12,
     /**
-     * Night needs the sensor really covered (near-total darkness), not just shade.
-     * micro:bit light level is 0..255; a finger over the top LEDs reads ~0-8.
-     * Night when light <= max(nightMaxLevel, open level × nightMaxRatio).
+     * Night needs the sensor covered, not just a passing shade.
+     * micro:bit light level is 0..255. Night when light <= max(nightMaxLevel,
+     * the room's usual level × nightMaxRatio); a hand's shadow (~30-50%) stays day.
      */
-    nightMaxLevel: 6,
-    nightMaxRatio: 0.05,
-    /** Back to day when light > max(dayMinLevel, open level × dayMinRatio). */
-    dayMinLevel: 14,
-    dayMinRatio: 0.15,
+    nightMaxLevel: 14,
+    nightMaxRatio: 0.18,
+    /** Back to day when light > max(dayMinLevel, usual level × dayMinRatio). */
+    dayMinLevel: 22,
+    dayMinRatio: 0.3,
     /** Night must be held this long before switching (filters a passing shadow). */
-    nightHold: 0.25,
+    nightHold: 0.15,
     /** Hysteresis band as fraction of (open - covered). */
     lightHysteresis: 0.18,
     /** Minimum light separation required by calibration (0..255 units). */
