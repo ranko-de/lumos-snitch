@@ -14,9 +14,10 @@ export interface Calibration {
 }
 
 export function defaultCalibration(): Calibration {
-  // micro:bit axes: X grows when tilting right, Y grows when the top (USB/logo)
-  // edge dips forward. Held flat with LEDs up, that is all we need.
-  return { neutralPitch: 0, neutralRoll: 0, rollSign: 1, forwardSign: 1, lightOpen: 120, lightCovered: 20 };
+  // Roll grows when tilting right. Pitch from the firmware DROPS when the top
+  // (USB/logo) edge points down, so forwardSign -1 gives the intuitive mapping:
+  // point the board up → climb, point it down → dive (verified on real boards).
+  return { neutralPitch: 0, neutralRoll: 0, rollSign: 1, forwardSign: -1, lightOpen: 120, lightCovered: 20 };
 }
 
 export function median(values: readonly number[]): number {

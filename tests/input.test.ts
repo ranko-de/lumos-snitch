@@ -34,6 +34,13 @@ describe('tilt processing', () => {
     expect(forward.climb).toBeLessThan(-0.9);
   });
 
+  it('by default, pointing the board up climbs and pointing it down dives', () => {
+    const cal = defaultCalibration();
+    // Firmware pitch goes negative when the top edge points down.
+    expect(tiltToAxes(-40, 0, cal, 1).climb).toBeLessThan(-0.9);
+    expect(tiltToAxes(40, 0, cal, 1).climb).toBeGreaterThan(0.9);
+  });
+
   it('calibration rejects a too-small tilt', () => {
     expect(tiltSign(0, 4)).toBeNull();
     expect(tiltSign(0, -25)).toBe(-1);
