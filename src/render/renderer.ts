@@ -30,6 +30,8 @@ import { clothTime, createDumbledoreFigure, createRider, createSnitchMesh, type 
 import { Crowd } from './crowd';
 import { Particles, WindStreaks } from './effects';
 import { buildStadium, type StadiumParts } from './stadium';
+import { RainSheet, StormCloud } from './storm';
+import { rainOn } from '../game/eggs';
 import { makeGlowTexture } from './textures';
 
 const CAM = CONFIG.camera;
@@ -107,6 +109,8 @@ export class GameRenderer {
   private readonly bolt: Group;
   private readonly particles: Particles;
   private readonly streaks: [WindStreaks, WindStreaks];
+  private readonly stormCloud: StormCloud;
+  private readonly rainSheets: [RainSheet, RainSheet];
   private readonly hemi: HemisphereLight;
   private readonly dir: DirectionalLight;
   private readonly fog: Fog;
@@ -219,9 +223,14 @@ export class GameRenderer {
 
     this.cameras = [this.makeCamera(1), this.makeCamera(2)];
     this.streaks = [new WindStreaks(), new WindStreaks()];
+    this.rainSheets = [new RainSheet(lowQuality ? 140 : 220), new RainSheet(lowQuality ? 140 : 220)];
+    this.stormCloud = new StormCloud(lowQuality);
+    this.scene.add(this.stormCloud.root);
     this.cameras.forEach((cam, i) => {
       this.streaks[i].lines.layers.set(i + 1);
       cam.add(this.streaks[i].lines);
+      this.rainSheets[i].lines.layers.set(i + 1);
+      cam.add(this.rainSheets[i].lines);
       this.scene.add(cam);
     });
     this.attractCamera = new PerspectiveCamera(55, 1, 0.5, 3000);
@@ -314,6 +323,9 @@ export class GameRenderer {
           this.particles.emit(p.pos, 12, 0xd8e6c8, 3, { life: 0.5, size: 0.4 });
           break;
         }
+        case 'stormSummon':
+          this.particles.emit(sim.storm.pos, 50, 0x9fb3d9, 5, { life: 1.2, size: 0.6, spread: new Vector3(3, 1, 3) });
+          break;
         case 'dumbledoreTrigger':
           this.particles.emit(BOOTH.seat, 40, 0xc58bff, 4, { life: 1.0, size: 0.4, spread: new Vector3(1, 2, 1) });
           break;
@@ -420,6 +432,12 @@ export class GameRenderer {
       const k = this.reducedMotion ? 0 : Math.max(0, Math.min(1, (p.speed - 12) / 10)) * 0.35;
       this.streaks[i].update(dt, p.speed, sim.phase === 'attract' ? 0 : k);
     }
+
+    // Rain cloud (easter egg 3): world cloud + rain sheet in the victim's camera only.
+    const st = sim.storm;
+    const showStorm = sim.phase === 'playing';
+    this.stormCloud.update(st.pos.x, st.pos.y, st.pos.z, showStorm ? st.cloud : 0, showStorm ? st.rain : 0, time, dt);
+    for (let i = 0; i < 2; i++) this.rainSheets[i].update(dt, showStorm ? rainOn(st, i) : 0);
 
     // Booth hint sparkle flicker is per view (see applyView).
     this.attractAngle += dt * 0.06;

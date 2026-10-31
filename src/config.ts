@@ -162,6 +162,25 @@ export const CONFIG = {
     tieTolerance: 0.05,
   },
 
+  /** Easter egg 3: fly through three different hoops → a rain cloud chases the opponent. */
+  storm: {
+    hoopsNeeded: 3,
+    /** How fast the cloud chases its victim (faster than a boosting broom). */
+    chaseSpeed: 44,
+    /** Rain starts once the cloud is this close (horizontally) to the victim. */
+    rainRange: 7,
+    /** If the cloud has not reached its victim after this long, it rains anyway. */
+    maxChase: 8,
+    /** Cloud floats this high above the victim. */
+    height: 6.5,
+    /** Seconds of rain on the victim. */
+    duration: 10,
+    /** Fade-out time of the cloud after the rain. */
+    fade: 1.4,
+    /** Pause before the next storm can be summoned. */
+    cooldown: 6,
+  },
+
   dumbledore: {
     /** Fly into this sphere in front of the booth balcony to pick him up. */
     zoneRadius: 11,

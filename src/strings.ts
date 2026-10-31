@@ -94,6 +94,10 @@ export const STRINGS = {
   dumbledoreUsed: 'Booth: used',
   dumbledoreCooldown: (s: number) => `Booth: ${s}s`,
   haunted: 'The stands are haunted!',
+  hoopProgress: (n: number, of: number) => `☂ Hoops ${n}/${of}`,
+  stormSummoned: 'Storm summoned! The rain cloud is after your opponent!',
+  stormChasing: 'A rain cloud is chasing you!',
+  stormRain: 'Rain!',
   boundary: 'Turn back — edge of the grounds',
 
   playerName: (i: number) => `Player ${i + 1}`,

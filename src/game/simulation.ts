@@ -7,6 +7,11 @@ import { checkCatch, resolveCatches, type CatchAttempt, type CatchCheck } from '
 import {
   createDumbledore,
   createGhosts,
+  createStorm,
+  resetStorm,
+  stepStorm,
+  stormHoop,
+  type StormEvent,
   resetDumbledore,
   resetGhosts,
   stepDumbledore,
@@ -41,7 +46,8 @@ export type SimEvent =
   | { type: 'overtime' }
   | { type: 'matchEnd'; winner: 0 | 1 | -1 }
   | DumbledoreEvent
-  | GhostEvent;
+  | GhostEvent
+  | StormEvent;
 
 export interface PracticeProgress {
   left: boolean;
@@ -65,6 +71,7 @@ export class Simulation {
   readonly snitch: SnitchState = createSnitch();
   readonly dumbledore = createDumbledore();
   readonly ghosts = createGhosts();
+  readonly storm = createStorm();
   readonly events: SimEvent[] = [];
   readonly practice: [PracticeProgress, PracticeProgress] = [freshPractice(), freshPractice()];
 
@@ -83,7 +90,7 @@ export class Simulation {
   private readonly check: CatchCheck = { ok: false, distance: 0 };
   private readonly successes: CatchAttempt[] = [];
   private chaserPositions: Vector3[] = [this.players[0].pos, this.players[1].pos];
-  private readonly eggEvents: (DumbledoreEvent | GhostEvent)[] = [];
+  private readonly eggEvents: (DumbledoreEvent | GhostEvent | StormEvent)[] = [];
   private readonly scratch = new Vector3();
   private readonly prevPos = [new Vector3(), new Vector3()];
 
@@ -99,6 +106,7 @@ export class Simulation {
     placeSnitch(this.snitch, this.scratch.set(0, 12, 0), this.rng);
     resetDumbledore(this.dumbledore);
     resetGhosts(this.ghosts);
+    resetStorm(this.storm);
     this.timeLeft = M.duration;
     this.countdown = 0;
     this.overtime = false;
@@ -209,7 +217,12 @@ export class Simulation {
       const r = stepFlight(this.players[i], cmds[i], dt);
       if (r.bumped) this.events.push({ type: 'bump', player: i });
       const ring = ringPassed(this.prevPos[i], this.players[i].pos);
-      if (ring) this.events.push({ type: 'ring', player: i, at: ring.center.clone() });
+      if (ring) {
+        this.events.push({ type: 'ring', player: i, at: ring.center.clone() });
+        // Easter egg 3: three different hoops summon a rain cloud (needs an opponent).
+        if (this.phase === 'playing' && !this.singlePlayer)
+          stormHoop(this.storm, i, RINGS.indexOf(ring), this.events as StormEvent[]);
+      }
     }
 
     if (this.phase === 'practice') this.trackPractice(cmds);
@@ -234,6 +247,8 @@ export class Simulation {
     // Dumbledore needs an opponent to hex, so he only appears in two-player games.
     if (this.phase === 'playing' && !this.singlePlayer)
       stepDumbledore(this.dumbledore, this.players, dt, this.rng, this.eggEvents as DumbledoreEvent[]);
+    if (this.phase === 'playing' && !this.singlePlayer)
+      stepStorm(this.storm, this.players, dt, this.eggEvents as StormEvent[]);
     const allDark = (!this.active[0] || p0.dark) && (!this.active[1] || p1.dark);
     stepGhosts(this.ghosts, allDark, dt, this.eggEvents as GhostEvent[]);
     for (const e of this.eggEvents) this.events.push(e);

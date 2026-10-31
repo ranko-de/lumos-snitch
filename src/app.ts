@@ -193,6 +193,8 @@ export class App {
     this.audio.setSnitchBuzz(near(0), near(1));
     const darkCount = split ? activePlayers.filter((p) => p.dark).length * (activePlayers.length === 1 ? 2 : 1) : 0;
     this.audio.setMusicMood(darkCount, split && this.sim.ghosts.haunted);
+    const st = this.sim.storm;
+    this.audio.setRain(split && this.sim.phase === 'playing' ? st.rain : 0, st.victim);
 
     if (this.screen === 'connect' || this.screen === 'calibrate' || this.overlay === 'disconnect') {
       this.updateCalibration(now);
@@ -271,6 +273,17 @@ export class App {
           break;
         case 'spellHit':
           this.audio.playSpellHit(e.victim);
+          this.audio.playOoh();
+          break;
+        case 'hoopProgress':
+          this.audio.playHoopProgress(e.count, e.player);
+          break;
+        case 'stormSummon':
+          this.hud.message(e.caster, STRINGS.stormSummoned, 2.5);
+          this.audio.playThunder(0.8);
+          break;
+        case 'rainStart':
+          this.audio.playThunder(1);
           this.audio.playOoh();
           break;
         case 'haunt':

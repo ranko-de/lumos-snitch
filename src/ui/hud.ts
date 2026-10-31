@@ -1,4 +1,5 @@
 import { CONFIG, PLAYER_CSS_COLORS } from '../config';
+import { rainOn } from '../game/eggs';
 import type { Simulation } from '../game/simulation';
 import type { SourceStatus } from '../input/types';
 import type { ViewInfo } from '../render/renderer';
@@ -11,7 +12,10 @@ interface HalfRefs {
   inputChip: HTMLElement;
   boothChip: HTMLElement;
   boostChip: HTMLElement;
+  hoopChip: HTMLElement;
   spell: HTMLElement;
+  storm: HTMLElement;
+  lens: LensRain;
   msg: HTMLElement;
   boundary: HTMLElement;
   reticle: HTMLElement;
@@ -78,9 +82,13 @@ export class Hud {
     const boostChip = span('chip ok');
     const boothChip = span('chip booth');
     boothChip.style.display = 'none';
-    row.append(dayChip, boostChip, inputChip, boothChip);
+    const hoopChip = span('chip hoops');
+    hoopChip.style.display = 'none';
+    row.append(dayChip, boostChip, inputChip, boothChip, hoopChip);
     card.append(name, score, row);
     const spell = div('hud-spell');
+    const storm = div('hud-storm');
+    const lens = new LensRain();
     const msg = div('hud-msg');
     const boundary = div('hud-boundary');
     boundary.textContent = STRINGS.boundary;
@@ -100,7 +108,7 @@ export class Hud {
     const keys = div('hud-keys');
     keys.dataset.role = 'keys';
     practice.append(title, ul, keys);
-    root.append(card, spell, msg, boundary, reticle, reticleLabel, practice);
+    root.append(lens.root, card, spell, storm, msg, boundary, reticle, reticleLabel, practice);
     this.root.appendChild(root);
     return {
       root,
@@ -109,7 +117,10 @@ export class Hud {
       inputChip,
       boothChip,
       boostChip,
+      hoopChip,
       spell,
+      storm,
+      lens,
       msg,
       boundary,
       reticle,
@@ -215,6 +226,19 @@ export class Hud {
       setClass(h.spell, 'on', crazy);
       if (crazy) setText(h.spell, `${STRINGS.crazyBroom} ${Math.ceil(p.crazyTime)}`);
 
+      // Rain-cloud easter egg: hoop progress, warning and the rain on this view only.
+      const storm = sim.storm;
+      const playing2 = sim.phase === 'playing' && !sim.singlePlayer;
+      const hoops = storm.hoops[i].length;
+      if (playing2 && hoops > 0) {
+        h.hoopChip.style.display = '';
+        setText(h.hoopChip, STRINGS.hoopProgress(hoops, CONFIG.storm.hoopsNeeded));
+      } else h.hoopChip.style.display = 'none';
+      const hunted = playing2 && storm.victim === i && (storm.phase === 'chase' || storm.phase === 'rain');
+      setClass(h.storm, 'on', hunted);
+      if (hunted) setText(h.storm, storm.phase === 'chase' ? `☁ ${STRINGS.stormChasing}` : `☔ ${STRINGS.stormRain} ${Math.ceil(storm.rainLeft)}`);
+      h.lens.update(dt, playing2 ? rainOn(storm, i) : 0);
+
       if (h.msgTimer > 0) h.msgTimer -= dt;
       setClass(h.msg, 'on', h.msgTimer > 0);
       setClass(h.boundary, 'on', p.nearBoundary);
@@ -263,4 +287,90 @@ function span(cls: string): HTMLSpanElement {
   const s = document.createElement('span');
   s.className = cls;
   return s;
+}
+
+/**
+ * Rain on the "lens" of one player's view: the view behind it is blurred and
+ * darkened (CSS backdrop filter) and water drops run down over it.
+ * Lives inside that player's half of the HUD, so the other view is untouched.
+ */
+class LensRain {
+  readonly root: HTMLDivElement;
+  private readonly canvas: HTMLCanvasElement;
+  private readonly ctx: CanvasRenderingContext2D | null;
+  private readonly drops: { x: number; y: number; r: number; v: number; life: number }[] = [];
+  private level = 0;
+
+  constructor() {
+    this.root = div('hud-rain');
+    this.canvas = document.createElement('canvas');
+    this.root.appendChild(this.canvas);
+    this.ctx = this.canvas.getContext('2d');
+  }
+
+  update(dt: number, intensity: number): void {
+    // Smooth so the overlay fades in and out instead of popping.
+    this.level += (intensity - this.level) * (1 - Math.exp(-dt * 4));
+    if (intensity <= 0 && this.level < 0.01) this.level = 0;
+    const on = this.level > 0.01;
+    setClass(this.root, 'on', on);
+    if (!on) {
+      this.drops.length = 0;
+      return;
+    }
+    this.root.style.opacity = this.level.toFixed(3);
+    const w = this.root.clientWidth;
+    const h = this.root.clientHeight;
+    if (!this.ctx || w < 2 || h < 2) return;
+    // Low-res canvas keeps the cost tiny; CSS scales it up.
+    const cw = Math.round(w / 2);
+    const ch = Math.round(h / 2);
+    if (this.canvas.width !== cw || this.canvas.height !== ch) {
+      this.canvas.width = cw;
+      this.canvas.height = ch;
+    }
+    const want = Math.round(70 * this.level);
+    while (this.drops.length < want) {
+      this.drops.push({ x: Math.random() * cw, y: Math.random() * ch * 0.9, r: 3 + Math.random() * 9, v: 0, life: 0 });
+    }
+    if (this.drops.length > want) this.drops.length = want;
+    const c = this.ctx;
+    c.clearRect(0, 0, cw, ch);
+    // Driving rain streaks across the glass.
+    c.strokeStyle = 'rgba(220,232,255,0.35)';
+    c.lineWidth = 1;
+    c.beginPath();
+    for (let k = 0; k < 60 * this.level; k++) {
+      const x = Math.random() * cw;
+      const y = Math.random() * ch;
+      c.moveTo(x, y);
+      c.lineTo(x - 4, y + 18 + Math.random() * 14);
+    }
+    c.stroke();
+    for (const d of this.drops) {
+      d.life += dt;
+      // Big drops start to slide down after a moment and leave the glass.
+      if (d.r > 6 && d.life > 0.4) d.v = Math.min(220, d.v + dt * 260);
+      d.y += d.v * dt;
+      if (d.y - d.r > ch) {
+        d.x = Math.random() * cw;
+        d.y = Math.random() * ch * 0.6;
+        d.r = 3 + Math.random() * 9;
+        d.v = 0;
+        d.life = 0;
+      }
+      const g = c.createRadialGradient(d.x - d.r * 0.3, d.y - d.r * 0.35, d.r * 0.1, d.x, d.y, d.r);
+      g.addColorStop(0, 'rgba(255,255,255,0.75)');
+      g.addColorStop(0.35, 'rgba(200,215,240,0.35)');
+      g.addColorStop(1, 'rgba(40,55,90,0.45)');
+      c.fillStyle = g;
+      c.beginPath();
+      c.ellipse(d.x, d.y, d.r * 0.85, d.r, 0, 0, Math.PI * 2);
+      c.fill();
+      if (d.v > 0) {
+        c.fillStyle = 'rgba(190,210,240,0.18)';
+        c.fillRect(d.x - d.r * 0.25, d.y - d.r * 4, d.r * 0.5, d.r * 3.4);
+      }
+    }
+  }
 }

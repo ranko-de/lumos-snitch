@@ -338,4 +338,19 @@ describe('single player', () => {
     expect(sim.practice[1].right).toBe(true);
     expect(sim.practice[0].right).toBe(false);
   });
+
+  it('flying through hoops in a two-player match counts toward the rain cloud', () => {
+    const sim = playing();
+    const p = sim.players[0];
+    const r = CONFIG.arena.ringX;
+    p.pos.set(r - 3, CONFIG.arena.ringHeights[1], 0);
+    p.yaw = -Math.PI / 2;
+    p.pitch = 0;
+    p.speed = CONFIG.flight.cruiseSpeed;
+    p.forward.set(1, 0, 0);
+    p.vel.set(CONFIG.flight.cruiseSpeed, 0, 0);
+    for (let t = 0; t < 0.5; t += STEP) sim.step(STEP, [cmd(), cmd()]);
+    expect(sim.storm.hoops[0].length).toBe(1);
+  });
 });
+

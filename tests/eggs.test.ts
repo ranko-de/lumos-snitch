@@ -5,6 +5,11 @@ import { BOOTH } from '../src/game/arena';
 import {
   createDumbledore,
   createGhosts,
+  createStorm,
+  rainOn,
+  stepStorm,
+  stormHoop,
+  type StormEvent,
   stepDumbledore,
   stepGhosts,
   type DumbledoreEvent,
@@ -190,5 +195,68 @@ describe('ghost crowd easter egg', () => {
     const haunts = ev.filter((e) => e.type === 'haunt') as { withSound: boolean }[];
     expect(haunts).toHaveLength(3);
     expect(haunts.filter((h) => h.withSound)).toHaveLength(1);
+  });
+});
+
+describe('rain cloud easter egg', () => {
+  const S = CONFIG.storm;
+  function stormSetup() {
+    const s = createStorm();
+    const players = [createPlayer(0), createPlayer(1)];
+    players[0].pos.set(-60, 12, 0);
+    players[1].pos.set(60, 12, 30);
+    const ev: StormEvent[] = [];
+    return { s, players, ev };
+  }
+
+  it('needs three DIFFERENT hoops; repeating one hoop does not count', () => {
+    const { s, players, ev } = stormSetup();
+    stormHoop(s, 0, 2, ev);
+    stormHoop(s, 0, 2, ev);
+    stormHoop(s, 0, 2, ev);
+    run(1, () => stepStorm(s, players, STEP, ev));
+    expect(s.phase).toBe('idle');
+    expect(s.hoops[0]).toEqual([2]);
+    stormHoop(s, 0, 4, ev);
+    stormHoop(s, 0, 5, ev);
+    stepStorm(s, players, STEP, ev);
+    expect(s.phase).toBe('chase');
+    expect(s.victim).toBe(1);
+    expect(ev.some((e) => e.type === 'stormSummon' && e.caster === 0 && e.victim === 1)).toBe(true);
+    expect(s.hoops[0].length).toBe(0);
+  });
+
+  it('chases the opponent, rains on them for 10 s, then fades and cools down', () => {
+    const { s, players, ev } = stormSetup();
+    for (const r of [0, 1, 3]) stormHoop(s, 1, r, ev);
+    stepStorm(s, players, STEP, ev);
+    expect(s.victim).toBe(0);
+    // The victim flies away; the cloud still catches up.
+    let t = 0;
+    while (s.phase === 'chase' && t < S.maxChase + 1) {
+      players[0].pos.x -= 22 * STEP;
+      stepStorm(s, players, STEP, ev);
+      t += STEP;
+    }
+    expect(s.phase).toBe('rain');
+    expect(t).toBeLessThan(S.maxChase);
+    run(1, () => stepStorm(s, players, STEP, ev));
+    expect(rainOn(s, 0)).toBeGreaterThan(0.9);
+    expect(rainOn(s, 1)).toBe(0);
+    const flat = Math.hypot(s.pos.x - players[0].pos.x, s.pos.z - players[0].pos.z);
+    expect(flat).toBeLessThan(S.rainRange);
+    run(S.duration - 1 + 0.1, () => stepStorm(s, players, STEP, ev));
+    expect(s.phase).toBe('fade');
+    expect(ev.some((e) => e.type === 'stormEnd')).toBe(true);
+    run(S.fade + 0.1, () => stepStorm(s, players, STEP, ev));
+    expect(s.phase).toBe('idle');
+    expect(s.cooldown).toBeGreaterThan(0);
+    // During cooldown three new hoops wait, then trigger once it is over.
+    for (const r of [0, 1, 2]) stormHoop(s, 0, r, ev);
+    stepStorm(s, players, STEP, ev);
+    expect(s.phase).toBe('idle');
+    run(S.cooldown, () => stepStorm(s, players, STEP, ev));
+    expect(s.phase).toBe('chase');
+    expect(s.victim).toBe(1);
   });
 });

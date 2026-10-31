@@ -291,3 +291,159 @@ export function stepGhosts(g: GhostState, bothDark: boolean, dt: number, events:
   const rate = dt / G.fade;
   g.blend = target > g.blend ? Math.min(1, g.blend + rate) : Math.max(0, g.blend - rate);
 }
+
+/* ------------------------------------------------------------------ */
+/* Easter egg 3: three different hoops → a rain cloud hunts the rival. */
+/* ------------------------------------------------------------------ */
+
+const S = CONFIG.storm;
+
+export type StormPhase = 'idle' | 'chase' | 'rain' | 'fade';
+
+export type StormEvent =
+  | { type: 'hoopProgress'; player: 0 | 1; count: number }
+  | { type: 'stormSummon'; caster: 0 | 1; victim: 0 | 1 }
+  | { type: 'rainStart'; victim: 0 | 1 }
+  | { type: 'stormEnd'; victim: 0 | 1 };
+
+export interface StormState {
+  phase: StormPhase;
+  phaseTime: number;
+  caster: 0 | 1 | -1;
+  victim: 0 | 1 | -1;
+  /** Distinct hoops (RINGS indices) each player has flown through since their last storm. */
+  hoops: [number[], number[]];
+  /** Seconds of rain left. */
+  rainLeft: number;
+  cooldown: number;
+  /** Cloud position (render uses this). */
+  pos: Vector3;
+  /** 0..1 cloud visibility. */
+  cloud: number;
+  /** 0..1 rain strength. */
+  rain: number;
+}
+
+export function createStorm(): StormState {
+  return {
+    phase: 'idle',
+    phaseTime: 0,
+    caster: -1,
+    victim: -1,
+    hoops: [[], []],
+    rainLeft: 0,
+    cooldown: 0,
+    pos: new Vector3(0, -500, 0),
+    cloud: 0,
+    rain: 0,
+  };
+}
+
+export function resetStorm(s: StormState): void {
+  s.phase = 'idle';
+  s.phaseTime = 0;
+  s.caster = -1;
+  s.victim = -1;
+  s.hoops[0].length = 0;
+  s.hoops[1].length = 0;
+  s.rainLeft = 0;
+  s.cooldown = 0;
+  s.pos.set(0, -500, 0);
+  s.cloud = 0;
+  s.rain = 0;
+}
+
+/** Records a hoop pass. Only different hoops count toward the storm. */
+export function stormHoop(s: StormState, player: 0 | 1, ringIndex: number, events: StormEvent[]): void {
+  const list = s.hoops[player];
+  if (list.includes(ringIndex) || list.length >= S.hoopsNeeded) return;
+  list.push(ringIndex);
+  events.push({ type: 'hoopProgress', player, count: list.length });
+}
+
+/** How hard it is raining on player i's view (0..1). */
+export function rainOn(s: StormState, i: number): number {
+  return s.victim === i ? s.rain : 0;
+}
+
+const target = new Vector3();
+const toTarget = new Vector3();
+
+function cloudTarget(victim: PlayerState, out: Vector3): Vector3 {
+  // Lead the victim a little so the cloud stays overhead even at speed.
+  return out.copy(victim.pos).addScaledVector(victim.vel, 0.35).setY(victim.pos.y + S.height);
+}
+
+export function stepStorm(s: StormState, players: readonly PlayerState[], dt: number, events: StormEvent[]): void {
+  if (s.cooldown > 0) s.cooldown = Math.max(0, s.cooldown - dt);
+
+  if (s.phase === 'idle') {
+    if (s.cooldown > 0) return;
+    for (const p of players) {
+      if (s.hoops[p.index].length < S.hoopsNeeded) continue;
+      s.caster = p.index;
+      s.victim = p.index === 0 ? 1 : 0;
+      s.hoops[p.index].length = 0;
+      // The cloud gathers above the caster, then races off after the victim.
+      s.pos.copy(p.pos).y += S.height + 2;
+      setStormPhase(s, 'chase');
+      events.push({ type: 'stormSummon', caster: p.index, victim: s.victim });
+      break;
+    }
+    return;
+  }
+
+  s.phaseTime += dt;
+  const victim = players[s.victim as 0 | 1];
+  cloudTarget(victim, target);
+  toTarget.subVectors(target, s.pos);
+
+  switch (s.phase) {
+    case 'chase': {
+      s.cloud = Math.min(1, s.cloud + dt / 0.6);
+      const dist = toTarget.length();
+      const stepLen = Math.min(dist, S.chaseSpeed * dt);
+      if (dist > 1e-6) s.pos.addScaledVector(toTarget, stepLen / dist);
+      const flat = Math.hypot(s.pos.x - victim.pos.x, s.pos.z - victim.pos.z);
+      if (flat <= S.rainRange || s.phaseTime >= S.maxChase) {
+        s.rainLeft = S.duration;
+        setStormPhase(s, 'rain');
+        events.push({ type: 'rainStart', victim: victim.index });
+      }
+      break;
+    }
+    case 'rain': {
+      s.cloud = 1;
+      // Sticks overhead: fast exponential follow, capped by the chase speed.
+      const k = 1 - Math.exp(-5 * dt);
+      const dist = toTarget.length();
+      const stepLen = Math.min(dist * k, S.chaseSpeed * dt);
+      if (dist > 1e-6) s.pos.addScaledVector(toTarget, stepLen / dist);
+      s.rainLeft = Math.max(0, s.rainLeft - dt);
+      s.rain = Math.min(1, s.rain + dt / 0.6, s.rainLeft / 0.8);
+      if (s.rainLeft <= 0) {
+        s.rain = 0;
+        setStormPhase(s, 'fade');
+        events.push({ type: 'stormEnd', victim: victim.index });
+      }
+      break;
+    }
+    case 'fade':
+      s.pos.y += dt * 4;
+      s.cloud = Math.max(0, 1 - s.phaseTime / S.fade);
+      if (s.phaseTime >= S.fade) {
+        s.cloud = 0;
+        s.pos.set(0, -500, 0);
+        s.cooldown = S.cooldown;
+        s.caster = -1;
+        s.victim = -1;
+        setStormPhase(s, 'idle');
+      }
+      break;
+  }
+}
+
+function setStormPhase(s: StormState, phase: StormPhase): void {
+  s.phase = phase;
+  s.phaseTime = 0;
+}

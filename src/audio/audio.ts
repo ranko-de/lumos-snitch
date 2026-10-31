@@ -19,6 +19,8 @@ export class GameAudio {
   private musicVolume = 0.6;
   private buzzGain: GainNode | null = null;
   private buzzPan: StereoPannerNode | null = null;
+  private rainGain: GainNode | null = null;
+  private rainPan: StereoPannerNode | null = null;
   private buzzOsc: OscillatorNode | null = null;
 
   /** Call from a user gesture (click / key). Safe to call repeatedly. */
@@ -141,6 +143,43 @@ export class GameAudio {
     this.buzzOsc.connect(buzzFilter).connect(trem).connect(this.buzzGain).connect(this.buzzPan).connect(this.master);
     this.buzzOsc.start();
     tremLfo.start();
+    // Rain hiss for the rain-cloud easter egg (silent until a storm rains).
+    const rain = this.loopNoise();
+    const rf = ctx.createBiquadFilter();
+    rf.type = 'highpass';
+    rf.frequency.value = 1800;
+    this.rainGain = ctx.createGain();
+    this.rainGain.gain.value = 0;
+    this.rainPan = ctx.createStereoPanner();
+    rain.connect(rf).connect(this.rainGain).connect(this.rainPan).connect(this.master);
+    rain.start(0, 0.7);
+  }
+
+  /** Rain loop level 0..1, panned toward the victim's half of the screen. */
+  setRain(level: number, victim: number): void {
+    if (!this.ctx || !this.rainGain || !this.rainPan) return;
+    const t = this.ctx.currentTime;
+    this.rainGain.gain.setTargetAtTime(level * 0.22, t, 0.25);
+    if (level > 0) this.rainPan.pan.setTargetAtTime(victim === 0 ? -0.45 : 0.45, t, 0.1);
+  }
+
+  /** Rolling thunder (a storm is summoned / starts raining). */
+  playThunder(strength = 1): void {
+    if (!this.ready()) return;
+    const t = this.ctx!.currentTime;
+    this.burstNoise(t, 0.25, 2600, 0.18 * strength);
+    this.burstNoise(t + 0.05, 2.4, 160, 0.55 * strength);
+    this.burstNoise(t + 0.4, 1.8, 90, 0.4 * strength);
+    this.tone(55, t + 0.05, 1.6, { type: 'sine', gain: 0.12 * strength, glide: 0.7, attack: 0.08 });
+  }
+
+  /** Little chime for each new hoop toward the storm. */
+  playHoopProgress(count: number, player: number): void {
+    if (!this.ready()) return;
+    const t = this.ctx!.currentTime;
+    const pan = player === 0 ? -0.3 : 0.3;
+    const notes = [523, 659, 784];
+    for (let k = 0; k < count; k++) this.tone(notes[k] ?? 784, t + 0.25 + k * 0.08, 0.3, { type: 'triangle', gain: 0.06, pan });
   }
 
   /**
