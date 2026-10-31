@@ -98,10 +98,12 @@ export class LightDetector {
 
 /**
  * Day/night from the light sensor WITHOUT calibration.
- * It keeps a running estimate of the uncovered ("open") light level: it rises
- * immediately to brighter readings and slowly forgets old ones. Covering the
- * top LED row drops the reading far below that level, which means "night".
- * Hysteresis + debounce stop flicker.
+ * Night only when the sensor is really covered: the reading must fall to
+ * near-total darkness, both in absolute terms and relative to the usual
+ * ("open") light level of the room. Shade from a hand, a body or a dim corner
+ * stays day. It goes back to day as soon as light clearly returns.
+ * The open level rises immediately to brighter readings and slowly forgets
+ * old ones, so it works in bright and dim rooms alike.
  */
 export class AdaptiveLight {
   dark = false;
@@ -109,13 +111,16 @@ export class AdaptiveLight {
   private candidateTime = 0;
 
   constructor(
-    private readonly darkRatio = 0.45,
-    private readonly lightRatio = 0.62,
-    private readonly debounce: number = I.lightDebounce,
+    private readonly nightMaxLevel = I.nightMaxLevel,
+    private readonly nightMaxRatio = I.nightMaxRatio,
+    private readonly dayMinLevel = I.dayMinLevel,
+    private readonly dayMinRatio = I.dayMinRatio,
+    private readonly nightHold: number = I.nightHold,
+    private readonly dayHold: number = I.lightDebounce,
     /** Seconds for the open-level estimate to forget a brighter past. */
     private readonly forget = 25,
     /** Below this open level the room is too dark to tell. */
-    private readonly minOpen = 6,
+    private readonly minOpen = 12,
   ) {}
 
   update(light: number, dt: number): boolean {
@@ -128,13 +133,15 @@ export class AdaptiveLight {
       this.candidateTime = 0;
       return false;
     }
-    const want = this.dark ? light < this.openLevel * this.lightRatio : light < this.openLevel * this.darkRatio;
+    const nightBelow = Math.max(this.nightMaxLevel, this.openLevel * this.nightMaxRatio);
+    const dayAbove = Math.max(this.dayMinLevel, this.openLevel * this.dayMinRatio);
+    const want = this.dark ? light <= dayAbove : light <= nightBelow;
     if (want === this.dark) {
       this.candidateTime = 0;
       return this.dark;
     }
     this.candidateTime += dt;
-    if (this.candidateTime >= this.debounce) {
+    if (this.candidateTime >= (want ? this.nightHold : this.dayHold)) {
       this.dark = want;
       this.candidateTime = 0;
     }

@@ -148,19 +148,43 @@ describe('no-calibration defaults', () => {
       const det = new AdaptiveLight();
       for (let k = 0; k < 60; k++) det.update(open + (k % 3) - 1, 1 / 20);
       expect(det.dark).toBe(false);
-      for (let k = 0; k < 10; k++) det.update(Math.round(open * 0.08), 1 / 20);
+      // Fully covered: near-total darkness.
+      for (let k = 0; k < 10; k++) det.update(2, 1 / 20);
       expect(det.dark).toBe(true);
       // Staying covered for a long time never makes "covered" the new normal.
-      for (let k = 0; k < 2000; k++) det.update(Math.round(open * 0.08), 1 / 20);
+      for (let k = 0; k < 2000; k++) det.update(2, 1 / 20);
       expect(det.dark).toBe(true);
       for (let k = 0; k < 10; k++) det.update(open, 1 / 20);
       expect(det.dark).toBe(false);
     }
   });
 
+  it('shade is not night: only a really covered sensor switches', () => {
+    for (const open of [200, 120, 40]) {
+      const det = new AdaptiveLight();
+      for (let k = 0; k < 60; k++) det.update(open, 1 / 20);
+      // Deep shade: a quarter (and even a sixth) of the room light stays day.
+      for (const shade of [open * 0.25, Math.max(10, open * 0.16), 15]) {
+        for (let k = 0; k < 100; k++) det.update(Math.round(shade), 1 / 20);
+        expect(det.dark).toBe(false);
+      }
+      // A finger right over the LEDs reads almost nothing → night.
+      for (let k = 0; k < 10; k++) det.update(1, 1 / 20);
+      expect(det.dark).toBe(true);
+    }
+  });
+
+  it('a quick passing shadow does not flip to night', () => {
+    const det = new AdaptiveLight();
+    for (let k = 0; k < 60; k++) det.update(150, 1 / 20);
+    for (let k = 0; k < 3; k++) det.update(1, 1 / 20); // 0.15 s
+    det.update(150, 1 / 20);
+    expect(det.dark).toBe(false);
+  });
+
   it('stays in day mode when the room is too dark to tell', () => {
     const det = new AdaptiveLight();
-    for (let k = 0; k < 100; k++) det.update(k % 2 ? 4 : 1, 1 / 20);
+    for (let k = 0; k < 100; k++) det.update(k % 2 ? 9 : 1, 1 / 20);
     expect(det.dark).toBe(false);
   });
 

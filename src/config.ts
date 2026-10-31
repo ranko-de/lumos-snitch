@@ -118,6 +118,18 @@ export const CONFIG = {
     /** Controller silent this long during play = disconnected → pause. */
     disconnectAfter: 1.5,
     lightDebounce: 0.12,
+    /**
+     * Night needs the sensor really covered (near-total darkness), not just shade.
+     * micro:bit light level is 0..255; a finger over the top LEDs reads ~0-8.
+     * Night when light <= max(nightMaxLevel, open level × nightMaxRatio).
+     */
+    nightMaxLevel: 6,
+    nightMaxRatio: 0.05,
+    /** Back to day when light > max(dayMinLevel, open level × dayMinRatio). */
+    dayMinLevel: 14,
+    dayMinRatio: 0.15,
+    /** Night must be held this long before switching (filters a passing shadow). */
+    nightHold: 0.25,
     /** Hysteresis band as fraction of (open - covered). */
     lightHysteresis: 0.18,
     /** Minimum light separation required by calibration (0..255 units). */
